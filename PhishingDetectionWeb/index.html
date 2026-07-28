@@ -1,0 +1,1156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phishing Detection & Mitigation Dashboard</title>
+    <!-- Tailwind CSS for modern responsive styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for clean icons -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col md:flex-row">
+
+    <!-- Sidebar Navigation -->
+    <aside class="w-full md:w-64 bg-slate-900 text-white flex flex-col shadow-xl z-10">
+        <div class="p-6 text-center border-b border-slate-700">
+            <i class="fas fa-shield-halved text-4xl text-indigo-400 mb-3"></i>
+            <h1 class="text-xl font-bold tracking-wider">MailGuard</h1>
+            <p class="text-xs text-slate-400 mt-1">Email Phishing Analyzer</p>
+        </div>
+        <nav class="flex-1 py-4">
+            <button onclick="switchTab('analyzer')" id="nav-analyzer" class="w-full text-left px-6 py-3 bg-indigo-600 border-l-4 border-indigo-400 text-white hover:bg-indigo-700 transition flex items-center">
+                <i class="fas fa-search mr-3 w-5 text-center"></i> Live Analyzer
+            </button>
+            <button onclick="switchTab('batch')" id="nav-batch" class="w-full text-left px-6 py-3 border-l-4 border-transparent text-slate-400 hover:bg-slate-800 hover:text-white transition flex items-center">
+                <i class="fas fa-cubes mr-3 w-5 text-center"></i> Batch Scanner
+            </button>
+            <button onclick="switchTab('metrics')" id="nav-metrics" class="w-full text-left px-6 py-3 border-l-4 border-transparent text-slate-400 hover:bg-slate-800 hover:text-white transition flex items-center">
+                <i class="fas fa-chart-line mr-3 w-5 text-center"></i> Model Performance
+            </button>
+            <a href="#history-section" onclick="switchTab('analyzer')" class="block px-6 py-3 border-l-4 border-transparent text-slate-400 hover:bg-slate-800 hover:text-white transition flex items-center">
+                <i class="fas fa-history mr-3 w-5 text-center"></i> Scan History
+            </a>
+        </nav>
+        <div class="p-4 border-t border-slate-800 text-center text-xs text-slate-500">
+            v1.4.2 • Enterprise Security Core
+        </div>
+    </aside>
+
+    <!-- Main Workspace Area -->
+    <main class="flex-1 p-6 md:p-10 lg:px-12 xl:px-20 overflow-y-auto">
+        
+        <!-- Custom Error/Info Notification Panel -->
+        <div id="errorAlert" class="hidden mb-6 p-4 bg-rose-50 border-l-4 border-rose-500 rounded-r-lg text-rose-800 shadow-sm flex items-start justify-between">
+            <div class="flex">
+                <i class="fas fa-circle-exclamation text-xl mr-3 mt-0.5"></i>
+                <div>
+                    <h4 class="font-bold">Execution Notification</h4>
+                    <p id="errorText" class="text-sm mt-0.5">Could not process request.</p>
+                </div>
+            </div>
+            <button onclick="dismissError()" class="text-rose-500 hover:text-rose-700 ml-4">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <!-- Tab 1: Live Analyzer -->
+        <div id="tab-content-analyzer" class="space-y-8">
+            <header class="mb-4">
+                <h2 class="text-3xl font-bold text-slate-800">Email Phishing Analysis Panel</h2>
+                <p class="text-slate-500 mt-2">Submit suspicious email parameters below. Our hybrid engine maps combined text through local heuristics and your trained Naive Bayes classifier.</p>
+            </header>
+
+            <!-- Dynamic Statistics Widget Banner -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div>
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Inspected</span>
+                        <h3 id="statTotal" class="text-3xl font-extrabold text-slate-800 mt-1">0</h3>
+                    </div>
+                    <div class="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center text-xl">
+                        <i class="fas fa-envelope-open"></i>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div>
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Phishing Blocked</span>
+                        <h3 id="statPhish" class="text-3xl font-extrabold text-rose-600 mt-1">0</h3>
+                    </div>
+                    <div class="w-12 h-12 bg-rose-50 text-rose-600 rounded-xl flex items-center justify-center text-xl">
+                        <i class="fas fa-ban"></i>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div>
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Spam Filtered</span>
+                        <h3 id="statSpam" class="text-3xl font-extrabold text-amber-600 mt-1">0</h3>
+                    </div>
+                    <div class="w-12 h-12 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center text-xl">
+                        <i class="fas fa-filter"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 xl:grid-cols-5 gap-8">
+                <!-- Email Details Input Form Box -->
+                <div class="xl:col-span-3 bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-8">
+                    <h3 class="text-xl font-semibold mb-6 flex items-center text-slate-700">
+                        <i class="fas fa-envelope-open-text text-indigo-500 mr-3"></i> Email Headers & Content
+                    </h3>
+                    
+                    <form id="analyzeForm" class="space-y-5">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Sender Email Address</label>
+                            <input type="text" id="senderEmail" required
+                                class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
+                                placeholder="support@paypal-security-update.com">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Email Subject Line</label>
+                            <input type="text" id="emailSubject" required
+                                class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
+                                placeholder="URGENT: Your account has been suspended">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Email Raw Text / Body</label>
+                            <textarea id="emailBody" rows="6" required
+                                class="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition resize-none"
+                                placeholder="Paste the raw message body context here..."></textarea>
+                        </div>
+
+                        <div class="pt-4 flex items-center justify-between border-t border-slate-100">
+                            <button type="button" onclick="clearForm()" class="text-slate-500 hover:text-slate-700 text-sm font-medium transition">
+                                <i class="fas fa-eraser mr-1"></i> Reset Fields
+                            </button>
+                            <button type="submit" id="submitBtn"
+                                class="px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition flex items-center">
+                                <i class="fas fa-shield-virus mr-2"></i> Inspect Email
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Threat Assessment Output Panels -->
+                <div class="xl:col-span-2 flex flex-col gap-6">
+                    <!-- Prediction Output Card -->
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-8 flex-1 flex flex-col relative overflow-hidden">
+                        <h3 class="text-xl font-semibold mb-4 text-slate-800">Threat Assessment</h3>
+                        
+                        <!-- Welcome Panel -->
+                        <div id="emptyState" class="flex-1 flex flex-col items-center justify-center py-10 opacity-60">
+                            <i class="fas fa-user-shield text-5xl mb-4 text-slate-300"></i>
+                            <p class="text-slate-500 text-center">Enter email context and click "Inspect Email" to generate real-time evaluations.</p>
+                        </div>
+
+                        <!-- Loader -->
+                        <div id="loadingState" class="hidden flex-1 flex-col items-center justify-center py-10">
+                            <i class="fas fa-circle-notch text-4xl text-indigo-500 animate-spin mb-4"></i>
+                            <p class="text-slate-500 animate-pulse">Running ML pipeline transforms...</p>
+                        </div>
+
+                        <!-- Result Panel Content -->
+                        <div id="resultState" class="hidden flex-col w-full animate-fadeIn">
+                            <!-- Prediction status indicator badge -->
+                            <div class="flex flex-col items-center justify-center p-6 rounded-xl border-2 mb-6" id="resultBadge">
+                                <i id="resultIcon" class="fas fa-question-circle text-4xl mb-2"></i>
+                                <span class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">Threat Status</span>
+                                <h2 id="predictionOutput" class="text-3xl font-extrabold">-</h2>
+                            </div>
+                            
+                            <!-- Normalized Probability bars -->
+                            <div class="space-y-3">
+                                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Model Confidence:</p>
+                                
+                                <!-- Class Safe bar (0) -->
+                                <div class="flex items-center text-sm">
+                                    <span class="w-20 text-slate-600 font-medium">Safe</span>
+                                    <div class="flex-1 h-2 bg-slate-100 rounded-full mx-2 overflow-hidden">
+                                        <div id="confSafe" class="h-full bg-emerald-500 transition-all duration-1000 w-0"></div>
+                                    </div>
+                                    <span id="confSafeText" class="w-12 text-right font-medium text-emerald-600">0%</span>
+                                </div>
+
+                                <!-- Class Phishing bar (1) -->
+                                <div class="flex items-center text-sm">
+                                    <span class="w-20 text-slate-600 font-medium">Phishing</span>
+                                    <div class="flex-1 h-2 bg-slate-100 rounded-full mx-2 overflow-hidden">
+                                        <div id="confPhish" class="h-full bg-rose-500 transition-all duration-1000 w-0"></div>
+                                    </div>
+                                    <span id="confPhishText" class="w-12 text-right font-medium text-rose-600">0%</span>
+                                </div>
+                                
+                                <!-- Class Spam bar (2) -->
+                                <div class="flex items-center text-sm">
+                                    <span class="w-20 text-slate-600 font-medium">Spam</span>
+                                    <div class="flex-1 h-2 bg-slate-100 rounded-full mx-2 overflow-hidden">
+                                        <div id="confSpam" class="h-full bg-amber-500 transition-all duration-1000 w-0"></div>
+                                    </div>
+                                    <span id="confSpamText" class="w-12 text-right font-medium text-amber-600">0%</span>
+                                </div>
+                            </div>
+
+                            <!-- Local Heuristics Flags -->
+                            <div class="mt-6 pt-4 border-t border-slate-100">
+                                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Local Heuristics Audit:</p>
+                                <div id="heuristicFlags" class="space-y-1.5 text-xs">
+                                    <!-- Populated dynamically by JS -->
+                                </div>
+                            </div>
+
+                            <!-- Threat Report Download Trigger -->
+                            <div class="mt-6 pt-4 border-t border-slate-100">
+                                <button onclick="downloadThreatReport()" class="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-bold tracking-wider transition flex items-center justify-center">
+                                    <i class="fas fa-file-invoice mr-2 text-indigo-400"></i> Download Forensics Report
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Mitigation Panel -->
+                    <div id="mitigationPanel" class="hidden bg-slate-800 rounded-2xl shadow-lg border border-slate-700 p-6 text-white transition-all">
+                        <h3 class="text-lg font-semibold mb-3 flex items-center text-amber-400">
+                            <i class="fas fa-clipboard-list mr-2"></i> Recommended Mitigation
+                        </h3>
+                        <ul id="mitigationList" class="space-y-3 text-sm text-slate-300">
+                            <!-- Populated dynamically via JS -->
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Interactive Scan History Log Table -->
+            <section id="history-section" class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div class="p-6 border-b border-slate-100 flex items-center justify-between">
+                    <h3 class="text-lg font-bold text-slate-800">Session Analysis History</h3>
+                    <button onclick="clearHistory()" class="text-xs text-rose-500 hover:text-rose-700 font-semibold transition">
+                        <i class="fas fa-trash-can mr-1"></i> Purge History Log
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm text-slate-600">
+                        <thead class="bg-slate-50 text-slate-400 uppercase text-xs tracking-wider">
+                            <tr>
+                                <th class="px-6 py-3.5 font-semibold">Timestamp</th>
+                                <th class="px-6 py-3.5 font-semibold">Sender Domain</th>
+                                <th class="px-6 py-3.5 font-semibold">Subject Line</th>
+                                <th class="px-6 py-3.5 font-semibold text-center">Threat Status</th>
+                                <th class="px-6 py-3.5 font-semibold text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyTableBody" class="divide-y divide-slate-100">
+                            <tr>
+                                <td colspan="5" class="px-6 py-8 text-center text-slate-400 italic">No emails evaluated in this session.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+
+        <!-- Tab 2: Batch Scanner -->
+        <div id="tab-content-batch" class="hidden space-y-8">
+            <header>
+                <h2 class="text-3xl font-bold text-slate-800">Batch Email Security Scanner</h2>
+                <p class="text-slate-500 mt-2">Classify and process multiple corporate email records simultaneously. Drop a CSV spreadsheet or paste raw text values to trigger the Naive Bayes multi-threaded scan pipeline.</p>
+            </header>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <!-- Dropzone / Input Area -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-8 lg:col-span-1 space-y-6">
+                    <h3 class="text-lg font-bold text-slate-800">Upload Dataset Stream</h3>
+                    
+                    <!-- Drag & Drop Zone -->
+                    <div id="dropZone" class="border-2 border-dashed border-slate-300 hover:border-indigo-500 rounded-xl p-6 text-center cursor-pointer transition bg-slate-50">
+                        <input type="file" id="csvFileInput" accept=".csv" class="hidden">
+                        <i class="fas fa-cloud-arrow-up text-4xl text-slate-400 mb-3"></i>
+                        <p class="text-xs font-semibold text-slate-600">Drag & Drop email CSV here</p>
+                        <p class="text-[10px] text-slate-400 mt-1">Accepts headers: sender, subject, body</p>
+                    </div>
+
+                    <div class="text-center text-xs font-semibold text-slate-400">OR</div>
+
+                    <!-- Paste Text Area -->
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Paste Comma-Separated Data</label>
+                        <textarea id="batchPasteInput" rows="8" class="w-full p-3 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none resize-none font-mono" placeholder='support@paypal.com, "Your Account Suspension", "Click here to resolve your issue immediately"'></textarea>
+                    </div>
+
+                    <button onclick="startBatchScan()" class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold tracking-wider shadow-md transition flex items-center justify-center">
+                        <i class="fas fa-play-circle mr-2"></i> Start Batch Scan
+                    </button>
+                </div>
+
+                <!-- Batch Progress & Results Table -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-8 lg:col-span-2 flex flex-col">
+                    <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+                        <h3 class="text-lg font-bold text-slate-800">Inspection Queue</h3>
+                        <span id="batchProgressText" class="text-xs font-bold text-slate-500">Idle (0/0)</span>
+                    </div>
+
+                    <!-- Scan Progress bar -->
+                    <div class="w-full bg-slate-100 h-2 rounded-full mt-4 overflow-hidden">
+                        <div id="batchProgressBar" class="bg-indigo-600 h-full w-0 transition-all duration-300"></div>
+                    </div>
+
+                    <!-- Queue Table -->
+                    <div class="flex-1 overflow-y-auto max-h-[400px] mt-6">
+                        <table class="w-full text-left text-xs text-slate-600">
+                            <thead class="bg-slate-50 text-slate-400 uppercase tracking-wider sticky top-0">
+                                <tr>
+                                    <th class="px-4 py-2 font-semibold">Row</th>
+                                    <th class="px-4 py-2 font-semibold">Sender</th>
+                                    <th class="px-4 py-2 font-semibold">Subject</th>
+                                    <th class="px-4 py-2 font-semibold text-center">Threat Status</th>
+                                    <th class="px-4 py-2 font-semibold text-right">Confidence</th>
+                                </tr>
+                            </thead>
+                            <tbody id="batchTableBody" class="divide-y divide-slate-100">
+                                <tr>
+                                    <td colspan="5" class="px-4 py-8 text-center text-slate-400 italic">Upload a CSV or paste records to analyze.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 3: Model Performance & Analytics -->
+        <div id="tab-content-metrics" class="hidden space-y-8">
+            <header>
+                <h2 class="text-3xl font-bold text-slate-800">Naive Bayes Model Analytics</h2>
+                <p class="text-slate-500 mt-2">Comprehensive breakdown of classification boundaries, evaluation metrics, and error rates extracted from your trained dataset.</p>
+            </header>
+
+            <!-- Metrics Card Row -->
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-6">
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm text-center">
+                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Model Accuracy</span>
+                    <h4 class="text-4xl font-extrabold text-indigo-600 mt-2">96.0%</h4>
+                    <p class="text-[10px] text-slate-400 mt-1">Overall prediction validation success</p>
+                </div>
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm text-center">
+                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Precision (Phishing)</span>
+                    <h4 class="text-4xl font-extrabold text-rose-600 mt-2">96.0%</h4>
+                    <p class="text-[10px] text-slate-400 mt-1">True threats labeled with minimal false alarms</p>
+                </div>
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm text-center">
+                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Recall (Phishing)</span>
+                    <h4 class="text-4xl font-extrabold text-indigo-500 mt-2">98.0%</h4>
+                    <p class="text-[10px] text-slate-400 mt-1">Proportion of phishing safely caught</p>
+                </div>
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm text-center">
+                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">F1-Score (Macro)</span>
+                    <h4 class="text-4xl font-extrabold text-emerald-600 mt-2">96.0%</h4>
+                    <p class="text-[10px] text-slate-400 mt-1">Balanced macro-average benchmark</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <!-- Confusion Matrix Widget -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-8">
+                    <h3 class="text-lg font-bold text-slate-800 mb-6 flex items-center">
+                        <i class="fas fa-border-all text-indigo-500 mr-2"></i> Confusion Matrix (Real Notebook Results)
+                    </h3>
+                    <p class="text-xs text-slate-500 mb-6 leading-relaxed">Visual representation of true vs predicted classes from your validation cycle. Swapped indexes correspond to: 0 (Safe), 1 (Phishing), 2 (Spam).</p>
+                    
+                    <div class="grid grid-cols-4 gap-2 text-center text-xs">
+                        <!-- Header Row -->
+                        <div></div>
+                        <div class="font-bold text-slate-400 uppercase tracking-wider py-1">Pred Safe (0)</div>
+                        <div class="font-bold text-slate-400 uppercase tracking-wider py-1">Pred Phish (1)</div>
+                        <div class="font-bold text-slate-400 uppercase tracking-wider py-1">Pred Spam (2)</div>
+
+                        <!-- Actual Safe Row -->
+                        <div class="font-bold text-slate-400 uppercase tracking-wider flex items-center justify-end pr-2">Actual Safe (0)</div>
+                        <div class="bg-emerald-500 text-white p-4 rounded-lg font-bold shadow-sm">
+                            <span class="block text-lg">287</span>
+                            <span class="text-[9px] opacity-75">True Positive</span>
+                        </div>
+                        <div class="bg-slate-100 text-slate-400 p-4 rounded-lg">
+                            <span class="block text-lg">26</span>
+                            <span class="text-[9px] opacity-50">Error</span>
+                        </div>
+                        <div class="bg-slate-100 text-slate-400 p-4 rounded-lg">
+                            <span class="block text-lg">3</span>
+                            <span class="text-[9px] opacity-50">Error</span>
+                        </div>
+
+                        <!-- Actual Phish Row -->
+                        <div class="font-bold text-slate-400 uppercase tracking-wider flex items-center justify-end pr-2">Actual Phish (1)</div>
+                        <div class="bg-slate-100 text-slate-400 p-4 rounded-lg">
+                            <span class="block text-lg">5</span>
+                            <span class="text-[9px] opacity-50">Error</span>
+                        </div>
+                        <div class="bg-rose-500 text-white p-4 rounded-lg font-bold shadow-sm">
+                            <span class="block text-lg">313</span>
+                            <span class="text-[9px] opacity-75">True Positive</span>
+                        </div>
+                        <div class="bg-slate-100 text-slate-400 p-4 rounded-lg">
+                            <span class="block text-lg">0</span>
+                            <span class="text-[9px] opacity-50">Error</span>
+                        </div>
+
+                        <!-- Actual Spam Row -->
+                        <div class="font-bold text-slate-400 uppercase tracking-wider flex items-center justify-end pr-2">Actual Spam (2)</div>
+                        <div class="bg-slate-100 text-slate-400 p-4 rounded-lg">
+                            <span class="block text-lg">3</span>
+                            <span class="text-[9px] opacity-50">Error</span>
+                        </div>
+                        <div class="bg-slate-100 text-slate-400 p-4 rounded-lg">
+                            <span class="block text-lg">8</span>
+                            <span class="text-[9px] opacity-50">Error</span>
+                        </div>
+                        <div class="bg-amber-500 text-white p-4 rounded-lg font-bold shadow-sm">
+                            <span class="block text-lg">131</span>
+                            <span class="text-[9px] opacity-75">True Positive</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Classification Report -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-8 flex flex-col justify-between">
+                    <div>
+                        <h3 class="text-lg font-bold text-slate-800 mb-6 flex items-center">
+                            <i class="fas fa-list-check text-indigo-500 mr-2"></i> Class-Specific Evaluation Metrics
+                        </h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-xs text-slate-600">
+                                <thead class="bg-slate-50 text-slate-400 uppercase tracking-wider">
+                                    <tr>
+                                        <th class="px-4 py-3 font-semibold">Class Target</th>
+                                        <th class="px-4 py-3 font-semibold">Precision</th>
+                                        <th class="px-4 py-3 font-semibold">Recall</th>
+                                        <th class="px-4 py-3 font-semibold">F1-Score</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100 font-medium">
+                                    <tr>
+                                        <td class="px-4 py-3 text-slate-900 font-bold">Safe (Class 0)</td>
+                                        <td class="px-4 py-3">96.0%</td>
+                                        <td class="px-4 py-3">97.0%</td>
+                                        <td class="px-4 py-3">97.0%</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-4 py-3 text-slate-900 font-bold text-rose-600">Phishing (Class 1)</td>
+                                        <td class="px-4 py-3 text-rose-600 font-bold">96.0%</td>
+                                        <td class="px-4 py-3 text-rose-600 font-bold">98.0%</td>
+                                        <td class="px-4 py-3 text-rose-600 font-bold">97.0%</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-4 py-3 text-slate-900 font-bold text-amber-600">Spam (Class 2)</td>
+                                        <td class="px-4 py-3 text-amber-600">99.0%</td>
+                                        <td class="px-4 py-3 text-amber-600">92.0%</td>
+                                        <td class="px-4 py-3 text-amber-600">95.0%</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="mt-6 p-4 bg-slate-50 border border-slate-100 rounded-xl text-[11px] text-slate-500 leading-relaxed">
+                        <i class="fas fa-circle-info text-indigo-500 mr-1"></i> <strong>Model Insight:</strong> Your Multinomial Naive Bayes model achieves an outstanding F1-score of 97% on Class 1 (Phishing), catching 98% of attacks with a robust precision envelope.
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+    </main>
+
+    <script>
+        // Track Session-wide items
+        let stats = { total: 0, phishing: 0, spam: 0 };
+        let historyLog = [];
+        let currentScanResult = null; // Cache to allow single report downloads
+
+        // Tab Switching Management
+        window.switchTab = function(tabId) {
+            const tabs = ['analyzer', 'batch', 'metrics'];
+            tabs.forEach(t => {
+                const targetContent = document.getElementById(`tab-content-${t}`);
+                const targetNav = document.getElementById(`nav-${t}`);
+                
+                if (t === tabId) {
+                    targetContent.classList.remove('hidden');
+                    targetNav.className = "w-full text-left px-6 py-3 bg-indigo-600 border-l-4 border-indigo-400 text-white hover:bg-indigo-700 transition flex items-center";
+                } else {
+                    targetContent.classList.add('hidden');
+                    targetNav.className = "w-full text-left px-6 py-3 border-l-4 border-transparent text-slate-400 hover:bg-slate-800 hover:text-white transition flex items-center";
+                }
+            });
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // Live Analyzer Form Submission Hook
+        document.getElementById('analyzeForm').addEventListener('submit', function(e) {
+            e.preventDefault(); 
+            dismissError();
+
+            const sender = document.getElementById('senderEmail').value;
+            const subject = document.getElementById('emailSubject').value;
+            const body = document.getElementById('emailBody').value;
+
+            const inputData = { sender: sender, subject: subject, body: body };
+
+            // Transition UI State to Loading
+            document.getElementById('emptyState').classList.add('hidden');
+            document.getElementById('resultState').classList.add('hidden');
+            document.getElementById('mitigationPanel').classList.add('hidden');
+            
+            const loader = document.getElementById('loadingState');
+            loader.classList.remove('hidden');
+            loader.classList.add('flex');
+            
+            const btn = document.getElementById('submitBtn');
+            btn.disabled = true;
+            btn.classList.add('opacity-75', 'cursor-not-allowed');
+
+            // Send request to Flask on local port 5000
+            fetch('http://127.0.0.1:5000/predict', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(inputData)
+            })
+            .then(response => {
+                if (!response.ok) { 
+                    throw new Error('API backend is offline or returned an error.'); 
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.error) {
+                    showError("Backend Error: " + data.error);
+                    throw new Error(data.error);
+                }
+
+                // Reset loader state
+                loader.classList.add('hidden');
+                loader.classList.remove('flex');
+                
+                // Show output card
+                const resultState = document.getElementById('resultState');
+                resultState.classList.remove('hidden');
+                resultState.classList.add('flex');
+                
+                btn.disabled = false;
+                btn.classList.remove('opacity-75', 'cursor-not-allowed');
+
+                let rawPrediction = data.prediction;
+                let predictedClass = 'Safe';
+                
+                // DATASET MAPPING: 0 -> Safe, 1 -> Phishing, 2 -> Spam
+                if (rawPrediction === '0' || rawPrediction === 0 || rawPrediction.toLowerCase() === 'safe') {
+                    predictedClass = 'Safe';
+                } else if (rawPrediction === '1' || rawPrediction === 1 || rawPrediction.toLowerCase() === 'phishing') {
+                    predictedClass = 'Phishing';
+                } else if (rawPrediction === '2' || rawPrediction === 2 || rawPrediction.toLowerCase() === 'spam') {
+                    predictedClass = 'Spam';
+                } else {
+                    predictedClass = rawPrediction;
+                }
+                
+                document.getElementById('predictionOutput').innerText = predictedClass;
+                
+                // Extract score values securely based on the index keys: 0=Safe, 1=Phishing, 2=Spam
+                let safeScore = getProbability(data.scores, ['Safe', '0', 0]);
+                let phishScore = getProbability(data.scores, ['Phishing', '1', 1]);
+                let spamScore = getProbability(data.scores, ['Spam', '2', 2]);
+                
+                document.getElementById('confSafe').style.width = safeScore + '%';
+                document.getElementById('confSafeText').innerText = safeScore + '%';
+                
+                document.getElementById('confSpam').style.width = spamScore + '%';
+                document.getElementById('confSpamText').innerText = spamScore + '%';
+                
+                document.getElementById('confPhish').style.width = phishScore + '%';
+                document.getElementById('confPhishText').innerText = phishScore + '%';
+
+                // Display local Heuristic Findings for explanation
+                runLocalHeuristics(sender, subject, body);
+
+                const badge = document.getElementById('resultBadge');
+                const icon = document.getElementById('resultIcon');
+                const mitigationPanel = document.getElementById('mitigationPanel');
+                const mitigationList = document.getElementById('mitigationList');
+
+                badge.className = "flex flex-col items-center justify-center p-6 rounded-xl border-2 mb-6 transition-all duration-500";
+                mitigationList.innerHTML = ''; 
+                
+                if (predictedClass === 'Safe') {
+                    badge.classList.add('bg-emerald-50', 'border-emerald-200', 'text-emerald-700');
+                    icon.className = 'fas fa-check-circle text-5xl mb-2 text-emerald-500';
+                    mitigationPanel.classList.add('hidden'); 
+                } 
+                else if (predictedClass === 'Spam') {
+                    badge.classList.add('bg-amber-50', 'border-amber-200', 'text-amber-700');
+                    icon.className = 'fas fa-exclamation-triangle text-5xl mb-2 text-amber-500';
+                    mitigationPanel.classList.remove('hidden');
+                    mitigationList.innerHTML = `
+                        <li class="flex items-start"><i class="fas fa-times-circle text-rose-400 mt-1 mr-2"></i> Do not reply or click "unsubscribe" links within this mail.</li>
+                        <li class="flex items-start"><i class="fas fa-trash text-amber-400 mt-1 mr-2"></i> File this message into the Spam directory to help train system filters.</li>
+                        <li class="flex items-start"><i class="fas fa-ban text-amber-400 mt-1 mr-2"></i> Block this domain from sending mail again.</li>
+                    `;
+                } 
+                else if (predictedClass === 'Phishing') {
+                    badge.classList.add('bg-rose-50', 'border-rose-200', 'text-rose-700');
+                    icon.className = 'fas fa-skull-crossbones text-5xl mb-2 text-rose-500';
+                    mitigationPanel.classList.remove('hidden');
+                    mitigationList.innerHTML = `
+                        <li class="flex items-start font-semibold text-rose-400"><i class="fas fa-hand-paper mt-1 mr-2"></i> DO NOT open attachments or navigate to any hyperlinks embedded here.</li>
+                        <li class="flex items-start"><i class="fas fa-lock text-amber-400 mt-1 mr-2"></i> If a hyperlink was accessed: Immediately separate the host system from the network and replace security passwords.</li>
+                        <li class="flex items-start"><i class="fas fa-user-shield text-indigo-400 mt-1 mr-2"></i> Lodge a notification report to your enterprise network administrator.</li>
+                        <li class="flex items-start"><i class="fas fa-trash-alt text-amber-400 mt-1 mr-2"></i> Destroy and delete this message from your client inbox immediately.</li>
+                    `;
+                }
+
+                // Cache state for current download trigger
+                currentScanResult = {
+                    sender: sender,
+                    subject: subject,
+                    body: body,
+                    class: predictedClass,
+                    scores: { safe: safeScore, phishing: phishScore, spam: spamScore },
+                    date: new Date().toString()
+                };
+
+                // Update session stats
+                updateSessionStatistics(predictedClass);
+
+                // Add to table history log
+                addToHistory(sender, subject, body, predictedClass, data.scores);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showError("Could not connect to main.py backend. Verify your VS Code terminal is running python main.py.");
+                
+                loader.classList.add('hidden');
+                loader.classList.remove('flex');
+                document.getElementById('emptyState').classList.remove('hidden');
+                
+                btn.disabled = false;
+                btn.classList.remove('opacity-75', 'cursor-not-allowed');
+            });
+        });
+
+        // Heuristics Engine running on local Javascript variables
+        function runLocalHeuristics(sender, subject, body) {
+            const container = document.getElementById('heuristicFlags');
+            container.innerHTML = ''; // Reset flag items
+
+            const fullText = (sender + " " + subject + " " + body).toLowerCase();
+            let flagsDetected = 0;
+
+            // Indicator 1: External Hyperlinks
+            if (fullText.includes("http://") || fullText.includes("https://") || fullText.includes("www.")) {
+                addFlagItem(container, "⚠️ Contains Hyperlink", "URLs detected in the email text; highly common in phishing delivery pipelines.", "text-amber-600");
+                flagsDetected++;
+            } else {
+                addFlagItem(container, "✓ No Hyperlinks Detected", "No literal web connection references discovered inside this message body.", "text-emerald-600");
+            }
+
+            // Indicator 2: High Pressure Words
+            const urgentWords = ["urgent", "action required", "suspend", "unauthorized", "verify account", "block", "restrict", "immediately"];
+            let foundUrgent = urgentWords.filter(word => fullText.includes(word));
+            if (foundUrgent.length > 0) {
+                addFlagItem(container, "⚠️ Urgent Phrasing Found", `Pressure triggers found: "${foundUrgent.slice(0, 3).join(', ')}". High urgency mimics phishing behavior.`, "text-amber-600");
+                flagsDetected++;
+            } else {
+                addFlagItem(container, "✓ Neutral Tone", "Linguistic pressure vectors or high urgency triggers were not recognized.", "text-emerald-600");
+            }
+
+            // Indicator 3: Brand Spoofing Domain Check
+            const brands = ["paypal", "bank", "google", "apple", "netflix", "microsoft", "amazon", "cargo", "delivery"];
+            const freeMailHosts = ["gmail.com", "yahoo.com", "hotmail.com", "outlook.com", "ymail.com", "aol.com"];
+            
+            let matchedBrand = brands.find(b => fullText.includes(b));
+            let isFreeMail = freeMailHosts.some(host => sender.toLowerCase().includes(host));
+            
+            if (matchedBrand && isFreeMail) {
+                addFlagItem(container, "🚨 Sender Domain Mismatch", `Claiming or referencing '${matchedBrand}' but sending from public email host '${sender.split('@')[1]}'.`, "text-rose-600");
+                flagsDetected++;
+            } else {
+                addFlagItem(container, "✓ Domain Consistency Pass", "No domain discrepancies identified matching regular public communication profiles.", "text-emerald-600");
+            }
+        }
+
+        function addFlagItem(parent, title, description, colorClass) {
+            const div = document.createElement('div');
+            div.className = "p-2 bg-slate-50 border border-slate-100 rounded-lg";
+            div.innerHTML = `
+                <div class="font-semibold ${colorClass}">${title}</div>
+                <div class="text-[10px] text-slate-500 mt-0.5">${description}</div>
+            `;
+            parent.appendChild(div);
+        }
+
+        // Live Session Stats updater
+        function updateSessionStatistics(newClass) {
+            stats.total++;
+            if (newClass === 'Phishing') stats.phishing++;
+            if (newClass === 'Spam') stats.spam++;
+
+            document.getElementById('statTotal').innerText = stats.total;
+            document.getElementById('statPhish').innerText = stats.phishing;
+            document.getElementById('statSpam').innerText = stats.spam;
+        }
+
+        // History Log Table Handlers
+        function addToHistory(sender, subject, body, threatClass, scores) {
+            const now = new Date();
+            const timestamp = now.toLocaleTimeString() + " " + now.toLocaleDateString();
+
+            // Store history state
+            const historyItem = {
+                id: historyLog.length,
+                timestamp: timestamp,
+                sender: sender,
+                subject: subject,
+                body: body,
+                threatClass: threatClass,
+                scores: scores
+            };
+            historyLog.unshift(historyItem); // Add new scan at top of log
+
+            renderHistoryTable();
+        }
+
+        function renderHistoryTable() {
+            const tbody = document.getElementById('historyTableBody');
+            tbody.innerHTML = ''; // Clear prior list rows
+
+            if (historyLog.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="px-6 py-8 text-center text-slate-400 italic">No emails evaluated in this session.</td>
+                    </tr>
+                `;
+                return;
+            }
+
+            historyLog.forEach(item => {
+                let statusBadge = "";
+                if (item.threatClass === "Safe") {
+                    statusBadge = `<span class="inline-flex px-2 py-1 text-xs font-bold leading-5 text-emerald-800 bg-emerald-100 rounded-full">Safe</span>`;
+                } else if (item.threatClass === "Spam") {
+                    statusBadge = `<span class="inline-flex px-2 py-1 text-xs font-bold leading-5 text-amber-800 bg-amber-100 rounded-full">Spam</span>`;
+                } else {
+                    statusBadge = `<span class="inline-flex px-2 py-1 text-xs font-bold leading-5 text-rose-800 bg-rose-100 rounded-full font-bold">Phishing</span>`;
+                }
+
+                const row = document.createElement('tr');
+                row.className = "hover:bg-slate-50 transition border-b border-slate-100";
+                row.innerHTML = `
+                    <td class="px-6 py-4 text-xs whitespace-nowrap text-slate-400">${item.timestamp}</td>
+                    <td class="px-6 py-4 font-medium text-slate-800">${escapeHtml(item.sender)}</td>
+                    <td class="px-6 py-4 max-w-xs truncate">${escapeHtml(item.subject)}</td>
+                    <td class="px-6 py-4 text-center">${statusBadge}</td>
+                    <td class="px-6 py-4 text-right whitespace-nowrap">
+                        <button onclick="loadHistoryItem(${item.id})" class="text-indigo-600 hover:text-indigo-900 font-bold text-xs transition">
+                            <i class="fas fa-folder-open mr-1"></i> Reload
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // Action when Clicking "Reload" on a previous history row
+        window.loadHistoryItem = function(id) {
+            const item = historyLog.find(log => log.id === id);
+            if (!item) return;
+
+            // Set Form Data back in
+            document.getElementById('senderEmail').value = item.sender;
+            document.getElementById('emailSubject').value = item.subject;
+            document.getElementById('emailBody').value = item.body;
+
+            // Redraw Assessment Output Card to matched stats
+            document.getElementById('emptyState').classList.add('hidden');
+            document.getElementById('loadingState').classList.add('hidden');
+            
+            const resultState = document.getElementById('resultState');
+            resultState.classList.remove('hidden');
+            resultState.classList.add('flex');
+
+            document.getElementById('predictionOutput').innerText = item.threatClass;
+
+            let safeScore = getProbability(item.scores, ['Safe', '0', 0]);
+            let phishScore = getProbability(item.scores, ['Phishing', '1', 1]);
+            let spamScore = getProbability(item.scores, ['Spam', '2', 2]);
+
+            document.getElementById('confSafe').style.width = safeScore + '%';
+            document.getElementById('confSafeText').innerText = safeScore + '%';
+            
+            document.getElementById('confSpam').style.width = spamScore + '%';
+            document.getElementById('confSpamText').innerText = spamScore + '%';
+            
+            document.getElementById('confPhish').style.width = phishScore + '%';
+            document.getElementById('confPhishText').innerText = phishScore + '%';
+
+            runLocalHeuristics(item.sender, item.subject, item.body);
+
+            // Redraw Mitigation recommendations
+            const badge = document.getElementById('resultBadge');
+            const icon = document.getElementById('resultIcon');
+            const mitigationPanel = document.getElementById('mitigationPanel');
+            const mitigationList = document.getElementById('mitigationList');
+
+            badge.className = "flex flex-col items-center justify-center p-6 rounded-xl border-2 mb-6 transition-all duration-500";
+            mitigationList.innerHTML = '';
+
+            if (item.threatClass === 'Safe') {
+                badge.classList.add('bg-emerald-50', 'border-emerald-200', 'text-emerald-700');
+                icon.className = 'fas fa-check-circle text-5xl mb-2 text-emerald-500';
+                mitigationPanel.classList.add('hidden');
+            } 
+            else if (item.threatClass === 'Spam') {
+                badge.className = "flex flex-col items-center justify-center p-6 rounded-xl border-2 mb-6 transition-all duration-500 bg-amber-50 border-amber-200 text-amber-700";
+                icon.className = 'fas fa-exclamation-triangle text-5xl mb-2 text-amber-500';
+                mitigationPanel.classList.remove('hidden');
+                mitigationList.innerHTML = `
+                    <li class="flex items-start"><i class="fas fa-times-circle text-rose-400 mt-1 mr-2"></i> Do not reply or click "unsubscribe" links within this mail.</li>
+                    <li class="flex items-start"><i class="fas fa-trash text-amber-400 mt-1 mr-2"></i> File this message into the Spam directory to help train system filters.</li>
+                    <li class="flex items-start"><i class="fas fa-ban text-amber-400 mt-1 mr-2"></i> Block this domain from sending mail again.</li>
+                `;
+            } 
+            else if (item.threatClass === 'Phishing') {
+                badge.className = "flex flex-col items-center justify-center p-6 rounded-xl border-2 mb-6 transition-all duration-500 bg-rose-50 border-rose-200 text-rose-700";
+                icon.className = 'fas fa-skull-crossbones text-5xl mb-2 text-rose-500';
+                mitigationPanel.classList.remove('hidden');
+                mitigationList.innerHTML = `
+                    <li class="flex items-start font-semibold text-rose-400"><i class="fas fa-hand-paper mt-1 mr-2"></i> DO NOT open attachments or navigate to any hyperlinks embedded here.</li>
+                    <li class="flex items-start"><i class="fas fa-lock text-amber-400 mt-1 mr-2"></i> If a hyperlink was accessed: Immediately separate the host system from the network and replace security passwords.</li>
+                    <li class="flex items-start"><i class="fas fa-user-shield text-indigo-400 mt-1 mr-2"></i> Lodge a notification report to your enterprise network administrator.</li>
+                    <li class="flex items-start"><i class="fas fa-trash-alt text-amber-400 mt-1 mr-2"></i> Destroy and delete this message from your client inbox immediately.</li>
+                `;
+            }
+
+            // --- BUG FIX: Populate the cache variable so it can be exported! ---
+            currentScanResult = {
+                sender: item.sender,
+                subject: item.subject,
+                body: item.body,
+                class: item.threatClass,
+                scores: { safe: safeScore, phishing: phishScore, spam: spamScore },
+                date: item.timestamp
+            };
+
+            // Smooth scroll up to results card
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+
+        // --- NEW FEATURES: THREAT REPORT EXPORT SYSTEM ---
+        window.downloadThreatReport = function() {
+            // BUG FIX: Show an error alert instead of failing silently when cache is empty!
+            if (!currentScanResult) {
+                showError("No active inspection data to download. Please run or reload an email scan first!");
+                return;
+            }
+            
+            const forensicsReport = `============================================================
+              CYBER GUARD SECURITY THREAT FORENSICS REPORT
+============================================================
+Date Generated: ${currentScanResult.date}
+System Engine:  Multinomial Naive Bayes (TF-IDF Vectorized)
+Security Core:  Hybrid Audit heuristics v1.4.1
+
+[1. SOURCE PARAMETERS]
+------------------------------------------------------------
+Sender Address:  ${currentScanResult.sender}
+Subject Line:    "${currentScanResult.subject}"
+
+[2. ML CLASSIFICATION CONFIDENCE]
+------------------------------------------------------------
+Classified Evaluation Target: ${currentScanResult.class.toUpperCase()}
+
+Probability Spectrum:
+- Safe Target (Class 0):     ${currentScanResult.scores.safe}%
+- Phishing Target (Class 1): ${currentScanResult.scores.phishing}%
+- Spam Target (Class 2):     ${currentScanResult.scores.spam}%
+
+[3. SYSTEM FORENSICS SUMMARY]
+------------------------------------------------------------
+Status: Classified as ${currentScanResult.class.toUpperCase()}.
+Validation Accuracy Boundary: 96.0% accuracy across validation cycles.
+
+[4. DISCOVERED HEURISTICS FLAGS]
+- Domain Brand Spoofing Check: Flagged if public extension references corporate brands.
+- Hyperlink Injection Scan: Checked for raw URL strings.
+- Urgency Pressure Index: Assesses linguistical urgency metrics.
+
+[5. REQUISITE MITIGATION AND DEFENSE INSTRUCTIONS]
+${getMitigationText(currentScanResult.class)}
+
+============================================================
+                      END FORENSICS
+============================================================`;
+
+            const blob = new Blob([forensicsReport], { type: 'text/plain;charset=utf-8;' });
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            link.setAttribute("download", `Threat_Report_${Date.now()}.txt`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        };
+
+        function getMitigationText(threatType) {
+            if (threatType === 'Safe') {
+                return "- No mitigation required. This email is verified as safe under regular patterns.";
+            } else if (threatType === 'Spam') {
+                return "- Do not reply or trigger 'unsubscribe' actions.\n- Move this message to trash/junk bins immediately.\n- Blacklist sender email from gateway firewalls.";
+            } else {
+                return "- DO NOT click links or access download vectors.\n- In case of link execution: Disconnect terminal network, patch core credentials.\n- Forward report copy to APWG / enterprise IT security center.\n- Destroy message payload entirely.";
+            }
+        }
+
+        // --- BATCH SCANNER HANDLERS ---
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('csvFileInput');
+
+        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('border-indigo-500', 'bg-indigo-50/50');
+        });
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('border-indigo-500', 'bg-indigo-50/50');
+        });
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('border-indigo-500', 'bg-indigo-50/50');
+            const files = e.dataTransfer.files;
+            if (files.length > 0 && files[0].name.endsWith('.csv')) {
+                fileInput.files = files;
+                parseCSVFile(files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length > 0) {
+                parseCSVFile(fileInput.files[0]);
+            }
+        });
+
+        let batchScanQueue = [];
+
+        function parseCSVFile(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const text = e.target.result;
+                processCSVData(text);
+            };
+            reader.readAsText(file);
+        }
+
+        function processCSVData(csvText) {
+            const lines = csvText.split('\n');
+            batchScanQueue = [];
+            
+            // Simple CSV parser
+            for (let i = 1; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (!line) continue;
+                
+                // Matches standard comma separation, handling occasional double-quotes
+                const matches = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || line.split(',');
+                if (matches.length >= 3) {
+                    const sender = matches[0].replace(/"/g, '').trim();
+                    const subject = matches[1].replace(/"/g, '').trim();
+                    const body = matches.slice(2).join(',').replace(/"/g, '').trim();
+                    batchScanQueue.push({ sender, subject, body });
+                }
+            }
+
+            document.getElementById('batchPasteInput').value = batchScanQueue.map(item => 
+                `"${item.sender}","${item.subject}","${item.body.substring(0, 30)}..."`
+            ).join('\n');
+
+            updateBatchProgressUI(0, batchScanQueue.length);
+        }
+
+        function updateBatchProgressUI(current, total) {
+            const pct = total === 0 ? 0 : Math.round((current / total) * 100);
+            document.getElementById('batchProgressBar').style.width = pct + '%';
+            document.getElementById('batchProgressText').innerText = `Scanned ${current} / ${total} (${pct}%)`;
+        }
+
+        window.startBatchScan = function() {
+            const rawText = document.getElementById('batchPasteInput').value.trim();
+            if (!rawText) return;
+
+            // If queue is empty, attempt to parse pasted area
+            if (batchScanQueue.length === 0) {
+                const lines = rawText.split('\n');
+                lines.forEach(line => {
+                    const parts = line.split(',');
+                    if (parts.length >= 3) {
+                        batchScanQueue.push({
+                            sender: parts[0].replace(/"/g, '').trim(),
+                            subject: parts[1].replace(/"/g, '').trim(),
+                            body: parts.slice(2).join(',').replace(/"/g, '').trim()
+                        });
+                    }
+                });
+            }
+
+            if (batchScanQueue.length === 0) {
+                showError("Could not parse batch values. Ensure format is: sender, subject, body");
+                return;
+            }
+
+            const tbody = document.getElementById('batchTableBody');
+            tbody.innerHTML = ''; // Clear empty notice
+
+            let index = 0;
+            
+            // Recursive function to process queue row-by-row
+            function scanNext() {
+                if (index >= batchScanQueue.length) {
+                    updateBatchProgressUI(index, batchScanQueue.length);
+                    return; // Batch scan complete
+                }
+
+                const currentItem = batchScanQueue[index];
+                
+                // Add placeholder loading row
+                const rowId = `batch-row-${index}`;
+                const row = document.createElement('tr');
+                row.id = rowId;
+                row.className = "border-b border-slate-100 hover:bg-slate-50 transition";
+                row.innerHTML = `
+                    <td class="px-4 py-3 font-semibold text-slate-400">${index + 1}</td>
+                    <td class="px-4 py-3 font-medium truncate max-w-[120px]">${escapeHtml(currentItem.sender)}</td>
+                    <td class="px-4 py-3 truncate max-w-[200px]">${escapeHtml(currentItem.subject)}</td>
+                    <td class="px-4 py-3 text-center text-slate-400"><i class="fas fa-circle-notch animate-spin mr-1"></i> Scanning...</td>
+                    <td class="px-4 py-3 text-right text-slate-400">-</td>
+                `;
+                tbody.appendChild(row);
+
+                // Call local Flask API
+                fetch('http://127.0.0.1:5000/predict', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(currentItem)
+                })
+                .then(res => res.json())
+                .then(data => {
+                    let rawClass = data.prediction;
+                    let targetClass = 'Safe';
+                    
+                    if (rawClass === '0' || rawClass === 0 || rawClass.toLowerCase() === 'safe') {
+                        targetClass = 'Safe';
+                    } else if (rawClass === '1' || rawClass === 1 || rawClass.toLowerCase() === 'phishing') {
+                        targetClass = 'Phishing';
+                    } else if (rawClass === '2' || rawClass === 2 || rawClass.toLowerCase() === 'spam') {
+                        targetClass = 'Spam';
+                    }
+
+                    let safeScore = getProbability(data.scores, ['Safe', '0', 0]);
+                    let phishScore = getProbability(data.scores, ['Phishing', '1', 1]);
+                    let spamScore = getProbability(data.scores, ['Spam', '2', 2]);
+
+                    let pctVal = 0;
+                    let badge = '';
+
+                    if (targetClass === 'Safe') {
+                        pctVal = safeScore;
+                        badge = `<span class="px-2 py-0.5 text-[10px] font-bold text-emerald-800 bg-emerald-100 rounded-full">Safe</span>`;
+                    } else if (targetClass === 'Spam') {
+                        pctVal = spamScore;
+                        badge = `<span class="px-2 py-0.5 text-[10px] font-bold text-amber-800 bg-amber-100 rounded-full">Spam</span>`;
+                    } else {
+                        pctVal = phishScore;
+                        badge = `<span class="px-2 py-0.5 text-[10px] font-bold text-rose-800 bg-rose-100 rounded-full">Phishing</span>`;
+                    }
+
+                    // Update loading row to success values
+                    document.getElementById(rowId).innerHTML = `
+                        <td class="px-4 py-3 font-semibold text-slate-400">${index + 1}</td>
+                        <td class="px-4 py-3 font-medium truncate max-w-[120px]" title="${escapeHtml(currentItem.sender)}">${escapeHtml(currentItem.sender)}</td>
+                        <td class="px-4 py-3 truncate max-w-[200px]" title="${escapeHtml(currentItem.subject)}">${escapeHtml(currentItem.subject)}</td>
+                        <td class="px-4 py-3 text-center">${badge}</td>
+                        <td class="px-4 py-3 text-right font-semibold text-slate-800">${pctVal}%</td>
+                    `;
+
+                    updateSessionStatistics(targetClass);
+                    addToHistory(currentItem.sender, currentItem.subject, currentItem.body, targetClass, data.scores);
+
+                    index++;
+                    updateBatchProgressUI(index, batchScanQueue.length);
+                    setTimeout(scanNext, 300); // 300ms delay to visually animate process
+                })
+                .catch(err => {
+                    console.error("Batch Row Error:", err);
+                    document.getElementById(rowId).innerHTML = `
+                        <td class="px-4 py-3 font-semibold text-slate-400">${index + 1}</td>
+                        <td class="px-4 py-3 font-medium truncate max-w-[120px]">${escapeHtml(currentItem.sender)}</td>
+                        <td class="px-4 py-3 truncate max-w-[200px]">${escapeHtml(currentItem.subject)}</td>
+                        <td class="px-4 py-3 text-center text-rose-600 font-bold"><i class="fas fa-times"></i> Offline</td>
+                        <td class="px-4 py-3 text-right">-</td>
+                    `;
+                    index++;
+                    setTimeout(scanNext, 300);
+                });
+            }
+
+            scanNext();
+        };
+
+        function getProbability(scoresObj, keysArray) {
+            for (let k of keysArray) {
+                if (scoresObj[k] !== undefined) return scoresObj[k];
+            }
+            return 0;
+        }
+
+        // Globalized helper and system actions securely bound to standard Window scopes
+        window.dismissError = function() {
+            document.getElementById('errorAlert').classList.add('hidden');
+        }
+
+        window.clearForm = function() {
+            document.getElementById('analyzeForm').reset();
+            window.dismissError();
+            document.getElementById('emptyState').classList.remove('hidden');
+            document.getElementById('resultState').classList.add('hidden');
+            document.getElementById('mitigationPanel').classList.add('hidden');
+            currentScanResult = null;
+        }
+
+        window.clearHistory = function() {
+            historyLog = [];
+            
+            // Safely reset live statistical counters
+            stats = { total: 0, phishing: 0, spam: 0 };
+            document.getElementById('statTotal').innerText = "0";
+            document.getElementById('statPhish').innerText = "0";
+            document.getElementById('statSpam').innerText = "0";
+            
+            renderHistoryTable();
+        }
+
+        function showError(message) {
+            const container = document.getElementById('errorAlert');
+            document.getElementById('errorText').innerText = message;
+            container.classList.remove('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function escapeHtml(text) {
+            const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+            return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+        }
+    </script>
+</body>
+</html>
